@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <!-- Download react, react-dom and babel libraries -->
+  <script src="https://unpkg.com/react@16/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/babel-standalone@6.26.0/babel.min.js"></script>
+  <!-- The rest of your head code -->
   <style>
     .document-row {
       display: flex;
@@ -66,43 +71,48 @@
       right: 10px;
     }
   </style>
-  <script>
-    var IsActiveId = false;
-    var data = @{outputs('Response_in_JSON')}
-
-    function signNow(capId, cupe_acceladocumenttype) {
-      IsActiveId = true;
-      document.getElementById('iframeContainer').style.display = 'flex';
-    }
-    
-    window.onload = function() {
-      var radioHtml = data.map(function(item, index) {
-        return `
-        <div class="document-row">
-          <input type="radio" id="documentType${index}" name="documentType" value="${item.cupe_acceladocumenttype}">
-          <label for="documentType${index}">${item.cupe_acceladocumenttype}</label>
-          <span>Status: Pending</span>
-          <button onclick="signNow('${item.capId}','${item.cupe_acceladocumenttype}')">Sign Now</button>
-          <img src="path_to_your_blank_qr_code.png" alt="QR Code">
-        </div>`
-      }).join('');
-      document.getElementById('documentTypesContainer').innerHTML = radioHtml;
-    
-      document.getElementById('closeIframeButton').addEventListener('click', function() {
-        document.getElementById('iframeContainer').style.display = 'none';
-      });
-    }
-  </script>
 </head>
 <body>
-  <div id="iframeContainer">
-    <button id="closeIframeButton">Close</button>
-    <iframe src="https://apps.cupertino.org/accela/inspections.aspx"></iframe>
-  </div>
-  <p>Your record id: @{triggerOutputs()['relativePathParameters']['capId']} </p>
-  <p>Required forms for this record</p>
-  <div id="documentTypesContainer">
-    <!-- Radio buttons with QR code, button and status will be populated here -->
-  </div>
+  <div id="react-app"></div>
+  <script type="text/babel">
+    const data = @{outputs('Response_in_JSON')}
+
+    function App() {
+      const [isActiveId, setIsActiveId] = React.useState(false);
+      const [iframeSrc, setIframeSrc] = React.useState("https://apps.cupertino.org/accela/inspections.aspx");
+      const closeIframe = () => {
+        setIsActiveId(false);
+        document.getElementById('iframeContainer').style.display = 'none';
+      }
+      
+      const signNow = () => {
+        setIsActiveId(true);
+        document.getElementById('iframeContainer').style.display = 'flex';
+      }
+
+      return (
+        <div>
+            <div id="iframeContainer">
+              <button id="closeIframeButton" onClick={closeIframe}>Close</button>
+              <iframe src={iframeSrc}></iframe>
+            </div>
+        
+          <p>Your record id: @{triggerOutputs()['relativePathParameters']['capId']} </p>
+          <p>Required forms for this record</p>
+          {data.map((item, index) => (
+            <div className="document-row" key={index}>
+              <input type="radio" id={`documentType${index}`} name="documentType" value={item.cupe_acceladocumenttype}/>
+              <label htmlFor={`documentType${index}`}>{item.cupe_acceladocumenttype}</label>
+              <span>Status: Pending</span>
+              <button onClick={() => signNow(item.capId, item.cupe_acceladocumenttype)}>Sign Now</button>
+              <img src="path_to_your_blank_qr_code.png" alt="QR Code"/>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    ReactDOM.render(<App />, document.getElementById('react-app'));
+  </script>
 </body>
 </html>
