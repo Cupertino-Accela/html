@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Hello, World!  </title>
+  <style>
+    .document-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 1em;
+    }
+
+    .document-row img {
+      margin-right: 1em;
+    }
+
+    .document-row button {
+      margin-right: 1em;
+    }
+  </style>
+  <script>
+    // Replace this variable with dynamic data from Power Automate
+    var data = @{outputs('Response_in_JSON')}
+
+    window.onload = function() {
+      var radioHtml = data.map(function(item, index) {
+        return `
+        <div class="document-row">
+          <input type="radio" id="documentType${index}" name="documentType" value="${item.cupe_acceladocumenttype}">
+          <label for="documentType${index}">${item.cupe_acceladocumenttype}</label>
+          <img src="path_to_your_blank_qr_code.png" alt="QR Code">
+          <button>Sign Now</button>
+          <span>Status: Pending</span>
+        </div>`
+      }).join('');
+
+      document.getElementById('documentTypesContainer').innerHTML = radioHtml;
+    }
+  </script>
+</head>
+<body>
+  <h1>Hello, World!</h1>
+  <p>capID to look up: @{triggerOutputs()['relativePathParameters']['capId']} </p>
+  <p>Here are the required formats for this record</p>
+  <div id="documentTypesContainer">
+    <!-- Radio buttons with QR code, button and status will be populated here -->
+  </div>
+</body>
+</html>
