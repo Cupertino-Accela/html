@@ -61,8 +61,8 @@
     }
 
     #iframeContainer iframe {
-      width: 80%;
-      height: 80%;
+      width: 100%;
+      height: 88%;
     }
 
     #iframeContainer button {
@@ -77,18 +77,107 @@
   <script type="text/babel">
     const data = @{outputs('Response_in_JSON')}
 
+    const DocumentRow = (props) => {
+
+      console.log('props -->', props);
+      const [showQRCode, setShowQRCode] = React.useState(false);
+      const [qrImageUrl, setQrImageUrl] = React.useState('');
+
+      const [status, setStatus] = React.useState(undefined);
+
+      const checkStatusUrl = "https://prod-51.westus.logic.azure.com/workflows/f78632e076c443f99ed877166046b17c/triggers/manual/paths/invoke/capId/@{triggerOutputs()['relativePathParameters']['capId']}/documentType/" + props.item.cupe_acceladocumenttype + "?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=anDTiVUK7jI-IR0DIQnkNRPcG_bTVCEMqadrjW4gl2I";
+
+      console.log('checkStatusUrl -->', checkStatusUrl)
+
+      const signNow = async (capId, documentType) => {
+
+        // @TODO - call the flow_api to create and get the signUrl response
+        var getSignUrl = "https://prod-21.westus.logic.azure.com/workflows/30c0a0f222f347aa9e98fec391ec7fa3/triggers/manual/paths/invoke/capId/@{triggerOutputs()['relativePathParameters']['capId']}/documentType/" + props.item.cupe_acceladocumenttype + "?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=_JH6IBRYA2jthpYwJuwqL29bBwNpzIuEuhJ45FR8_Mg"
+        
+        // fetch the getSignUrl and return response.signUrl
+        var response = await fetch(getSignUrl)
+        .then(response => response.json())
+        .then(data => {
+          console.log('data -->', data);          
+          const signUrl = data.signingUrlSetInfos[0].signingUrls[0].esignUrl;
+          console.log('signUrl -->', signUrl);
+          props.signNow(signUrl);
+          return data;
+        })
+        .catch(error => {
+          console.error(error);
+        });
+      }
+
+      React.useEffect(() => {
+          fetch(checkStatusUrl)
+          .then(response => response.json())
+          .then(data => {
+            console.log('data -->', data);
+            console.log('data.status -->', data.status);
+            setStatus(data.status);
+          })
+          .catch(error => {
+            console.error(error);
+          });
+
+      }, []);
+
+        var statusString = status != undefined ? 
+          status ? 
+            "SIGNED" : "NOT SIGNED" : "loading..."
+
+        console.log('statusString -->', statusString)
+        return (
+            <div className="document-row" key={props.index}>
+                  <input type="radio" id={`documentType${props.index}`} name="documentType" value={props.item.cupe_acceladocumenttype}/>
+                  <label htmlFor={`documentType${props.index}`}>{props.item.cupe_acceladocumenttype}</label>
+                  <span>Status: {statusString}</span>
+                  <button onClick={() => signNow(props.item.capId, props.item.cupe_acceladocumenttype)}>
+                    <img 
+                      //icon of a signature document
+                      src="https://img.icons8.com/ios/50/000000/signature.png"
+                      alt="Signature"
+                      style={{width: '20px', height: '20px', marginRight: '5px'}}
+                    />
+                    E-Sign Now</button>
+                  {!showQRCode &&
+                    <button onClick={async () => {
+                      setShowQRCode(!showQRCode);
+                      var qr = await signNow(props.item.capId, props.item.cupe_acceladocumenttype);
+                      setQrImageUrl(qr);
+                    }}>
+                    <img 
+                      //icon of a phone
+                      src={qrImageUrl}
+                      alt="QR Code"
+                      style={{width: '20px', height: '20px', marginRight: '5px'}}
+                    />
+                    Scan QR
+                    </button>}
+                  {showQRCode &&  <img src={qrImageUrl} alt="QR Code"/>}    
+            </div>
+          )
+  } 
+
+
     function App() {
       const [isActiveId, setIsActiveId] = React.useState(false);
-      const [iframeSrc, setIframeSrc] = React.useState("https://apps.cupertino.org/accela/inspections.aspx");
+      
+      const [iframeSrc, setIframeSrc] = React.useState("");
+     
+     
       const closeIframe = () => {
         setIsActiveId(false);
         document.getElementById('iframeContainer').style.display = 'none';
       }
       
-      const signNow = () => {
+      const signNow = (signUrl) => {
         setIsActiveId(true);
+        setIframeSrc(signUrl);
         document.getElementById('iframeContainer').style.display = 'flex';
       }
+
 
       return (
         <div>
@@ -98,15 +187,11 @@
             </div>
         
           <p>Your record id: @{triggerOutputs()['relativePathParameters']['capId']} </p>
-          <p>Required forms for this record</p>
+          <p>Required forms for this record:  
+            {data.filter(a => a).length}
+            </p>
           {data.map((item, index) => (
-            <div className="document-row" key={index}>
-              <input type="radio" id={`documentType${index}`} name="documentType" value={item.cupe_acceladocumenttype}/>
-              <label htmlFor={`documentType${index}`}>{item.cupe_acceladocumenttype}</label>
-              <span>Status: Pending</span>
-              <button onClick={() => signNow(item.capId, item.cupe_acceladocumenttype)}>Sign Now</button>
-              <img src="path_to_your_blank_qr_code.png" alt="QR Code"/>
-            </div>
+              <DocumentRow item={item} index={index} key={index} signNow={signNow} />
           ))}
         </div>
       );
