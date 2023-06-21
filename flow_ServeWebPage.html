@@ -70,6 +70,24 @@
       top: 10px;
       right: 10px;
     }
+
+    /* New spinner animation style */
+    .loader {
+      border: 8px solid #3498db;
+      border-top: 8px solid #f3f3f3;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+      margin-top: 50px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
   </style>
 </head>
 <body>
@@ -78,43 +96,32 @@
     const data = @{outputs('Response_in_JSON')}
 
     const DocumentRow = (props) => {
-
-      console.log('props -->', props);
       const [showQRCode, setShowQRCode] = React.useState(false);
       const [qrImageUrl, setQrImageUrl] = React.useState('');
-
       const [status, setStatus] = React.useState(undefined);
-
-      const checkStatusUrl = "https://prod-51.westus.logic.azure.com/workflows/f78632e076c443f99ed877166046b17c/triggers/manual/paths/invoke/capId/@{triggerOutputs()['relativePathParameters']['capId']}/documentType/" + props.item.cupe_acceladocumenttype + "?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=anDTiVUK7jI-IR0DIQnkNRPcG_bTVCEMqadrjW4gl2I";
-
-      console.log('checkStatusUrl -->', checkStatusUrl)
-
+      
       const signNow = async (capId, documentType) => {
-
-        // @TODO - call the flow_api to create and get the signUrl response
-        var getSignUrl = "https://prod-21.westus.logic.azure.com/workflows/30c0a0f222f347aa9e98fec391ec7fa3/triggers/manual/paths/invoke/capId/@{triggerOutputs()['relativePathParameters']['capId']}/documentType/" + props.item.cupe_acceladocumenttype + "?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=_JH6IBRYA2jthpYwJuwqL29bBwNpzIuEuhJ45FR8_Mg"
-        
-        // fetch the getSignUrl and return response.signUrl
+        props.setLoading(true)
+        var getSignUrl = "https://prod-21.westus.logic.azure.com/workflows/30c0a0f222f347aa9e98fec391ec7fa3/triggers/manual/paths/invoke/capId/@{triggerOutputs()['relativePathParameters']['capId']}/documentType/" + props.item.cupe_name + "?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=_JH6IBRYA2jthpYwJuwqL29bBwNpzIuEuhJ45FR8_Mg"
         var response = await fetch(getSignUrl)
         .then(response => response.json())
         .then(data => {
-          console.log('data -->', data);          
           const signUrl = data.signingUrlSetInfos[0].signingUrls[0].esignUrl;
           console.log('signUrl -->', signUrl);
-          props.signNow(signUrl);
-          return data;
+          props.setLoading(false)
+          return signUrl;
         })
         .catch(error => {
-          console.error(error);
+          console.error(error); x
         });
+        return response;
       }
 
+      const checkStatusUrl = "https://prod-51.westus.logic.azure.com/workflows/f78632e076c443f99ed877166046b17c/triggers/manual/paths/invoke/capId/@{triggerOutputs()['relativePathParameters']['capId']}/documentType/" + props.item.cupe_acceladocumenttype + "?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=anDTiVUK7jI-IR0DIQnkNRPcG_bTVCEMqadrjW4gl2I";
       React.useEffect(() => {
           fetch(checkStatusUrl)
           .then(response => response.json())
           .then(data => {
-            console.log('data -->', data);
-            console.log('data.status -->', data.status);
             setStatus(data.status);
           })
           .catch(error => {
@@ -126,14 +133,16 @@
         var statusString = status != undefined ? 
           status ? 
             "SIGNED" : "NOT SIGNED" : "loading..."
-
-        console.log('statusString -->', statusString)
         return (
             <div className="document-row" key={props.index}>
                   <input type="radio" id={`documentType${props.index}`} name="documentType" value={props.item.cupe_acceladocumenttype}/>
                   <label htmlFor={`documentType${props.index}`}>{props.item.cupe_acceladocumenttype}</label>
                   <span>Status: {statusString}</span>
-                  <button onClick={() => signNow(props.item.capId, props.item.cupe_acceladocumenttype)}>
+                  <button onClick={async () => {
+                    var url = await signNow(props.item.capId, props.item.cupe_acceladocumenttype)
+                    console.log('url -->', url);
+                    await props.signNow(url);
+                  }}>
                     <img 
                       //icon of a signature document
                       src="https://img.icons8.com/ios/50/000000/signature.png"
@@ -162,22 +171,21 @@
 
 
     function App() {
-      const [isActiveId, setIsActiveId] = React.useState(false);
-      
+      const [isActiveId, setIsActiveId] = React.useState(false);  
       const [iframeSrc, setIframeSrc] = React.useState("");
-     
-     
+      const [loading, setLoading] = React.useState(false);
+         
       const closeIframe = () => {
         setIsActiveId(false);
         document.getElementById('iframeContainer').style.display = 'none';
       }
       
       const signNow = (signUrl) => {
+        console.log('App ----   signUrl -->', signUrl);
         setIsActiveId(true);
         setIframeSrc(signUrl);
         document.getElementById('iframeContainer').style.display = 'flex';
       }
-
 
       return (
         <div>
@@ -185,14 +193,25 @@
               <button id="closeIframeButton" onClick={closeIframe}>Close</button>
               <iframe src={iframeSrc}></iframe>
             </div>
-        
-          <p>Your record id: @{triggerOutputs()['relativePathParameters']['capId']} </p>
-          <p>Required forms for this record:  
-            {data.filter(a => a).length}
-            </p>
-          {data.map((item, index) => (
-              <DocumentRow item={item} index={index} key={index} signNow={signNow} />
-          ))}
+
+            {loading && (
+            <div>
+              <div className="loader"></div>
+              <p style={{ textAlign: 'center', color: '#3498db' }}>Loading...</p>
+            </div>
+          )}
+            {!loading && (
+              <div>
+                <p>Your record id: @{triggerOutputs()['relativePathParameters']['capId']} </p>
+                <p>Required forms for this record:  
+                  {data.filter(a => a).length}
+                  </p>
+                {data.map((item, index) => (
+                    <DocumentRow item={item} index={index} key={index} signNow={signNow} loading={loading} setLoading={setLoading} />
+                ))}
+              </div>
+            )}
+  
         </div>
       );
     }
